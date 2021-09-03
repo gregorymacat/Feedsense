@@ -218,6 +218,68 @@ module.exports = {
       clientSecret,
       'http://localhost:3001/'
     );
+
+    //Get user form information to include in video upload
+    var formData = new Map();
+    var uploadedFilename;
+
+    req.pipe(req.busboy);
+
+    req.busboy.on('field', (fieldname, val) => {
+      formData.set(fieldname, val);
+      console.log(formData);
+    });
+    req.busboy.on('file', (fieldname, file, filename) => {
+      console.log(fieldname);
+      console.log(`Upload of ${filename} started`);
+      uploadedFilename = filename;
+
+      const fwstream = fs.createWriteStream(path.join(__dirname, `/../../public/videos/${filename}`));
+      file.pipe(fwstream);
+
+      fwstream.on('close', () => {
+        console.log(`Upload of ${filename} complete`);
+      });
+    });
+    req.busboy.on('finish', () => {
+      console.log('Parsed all of the form!');
+      oAuth2Client.setCredentials(formData.get('token'));
+      console.log('This is the auth client ', oAuth2Client, ' and the key is ', formData.get('token'));
+
+      const youtube = google.youtube({version: 'v3', auth: oAuth2Client});
+
+      //console.log(youtube);
+
+      youtube.videos.insert({
+        resource: {
+          snippet: {
+            title: formData.get('title'),
+            description: formData.get('description'),
+            tags: formData.get('tags')
+          },
+          status: {
+            privacyStatus: 'private'
+          }
+        },
+        part: 'snippet, status',
+        media: {
+          body: fs.createReadStream(path.join(__dirname, `/../../public/videos/${uploadedFilename}`))
+        }
+      }, (err, data) => {
+        if (err) {
+          res.status(400).send();
+          return console.error('UNABLE TO UPLOAD TO YOUTUBE ', err.stack);
+        }
+        console.log('Successfully upload to youtube! ', data);
+        fs.unlinkSync(path.join(__dirname, `/../../public/videos/${uploadedFilename}`));
+        res.send();
+      })
+    });
+  }
+}
+
+
+/*
     const scopes = [
       'https://www.googleapis.com/auth/youtube',
       'https://www.googleapis.com/auth/youtube.upload'
@@ -266,16 +328,5 @@ module.exports = {
     } getToken().catch(console.error);
       // })
       // .catch(err => console.error('ERROR REACHING URL FOR AUTH'))
-  }
-}
 
-
-// const scopes = [
-    //   'https://www.googleapis.com/auth/youtube',
-    //   'https://www.googleapis.com/auth/youtube.upload'
-    // ];
-
-    // const url = oauth2Client.generateAuthUrl({
-    //   access_type: 'offline',
-    //   scope: scopes
-    // });
+*/
