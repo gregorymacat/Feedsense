@@ -37,11 +37,13 @@ const Modal = ({show}) => {
 
   const handleSubmit = (event) => {
     event.preventDefault();
+    console.log(localStorage.access_token);
     var formData = new FormData();
     formData.append('title', videoTitle);
     formData.append('description', videoDesc);
     formData.append('tags', videoTags);
     formData.append('video', videoFile);
+    formData.append('token', localStorage.access_token);
 
     uploadFile(formData, config);
   }

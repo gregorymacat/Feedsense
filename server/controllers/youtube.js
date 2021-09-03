@@ -209,31 +209,73 @@ module.exports = {
   },
 
   postVideo: (req, res) => {
-    const youtube = google.youtube;
+    // Get youtube authorization to upload video
     const clientID = config.clientId;
     const clientSecret = config.OAuthData.clientSecret;
-    const clientURI = config.OAuthData.redirectURI;
+    const redirectURI = config.OAuthData.redirectURI;
+    const oAuth2Client = new google.auth.OAuth2(
+      clientID,
+      clientSecret,
+      'http://localhost:3001/'
+    );
+    const scopes = [
+      'https://www.googleapis.com/auth/youtube',
+      'https://www.googleapis.com/auth/youtube.upload'
+    ];
 
-    req.pipe(req.busboy);
-
-    // var formData = new Map();
-
-    // req.busboy.on('field', (fieldname, val) => {
-    //   formData.set(fieldname, val);
-    //   console.log(formData);
-    // })
-    // console.log('Moving on!');
-    req.busboy.on('file', (fieldname, file, filename) => {
-      console.log(fieldname);
-      console.log(`Upload of ${filename} started`);
-
-      const fwstream = fs.createWriteStream(path.join(__dirname, `/../../public/videos/${filename}`));
-      file.pipe(fwstream);
-
-      fwstream.on('close', () => {
-        console.log(`Upload of ${filename} complete`);
-        res.send();
-      });
+    const url = oAuth2Client.generateAuthUrl({
+      scope: scopes
     });
+    // res.redirect(url)
+    //   // .then(code => {
+    //     console.log('THIS IS THE URL ', url)
+    async function getToken() {
+      const {tokens} = await oAuth2Client.getToken('4')
+      oAuth2Client.setCredentials(tokens);
+      const youtube = google.youtube({version: 'v3', auth: oAuth2Client});
+
+      //Get user form information to include in video upload
+      var formData = new Map();
+
+      req.pipe(req.busboy);
+
+      req.busboy.on('field', (fieldname, val) => {
+        formData.set(fieldname, val);
+        console.log(formData);
+      });
+      req.busboy.on('file', (fieldname, file, filename) => {
+        console.log(fieldname);
+        console.log(`Upload of ${filename} started`);
+
+        const fwstream = fs.createWriteStream(path.join(__dirname, `/../../public/videos/${filename}`));
+        file.pipe(fwstream);
+
+        fwstream.on('close', () => {
+          console.log(`Upload of ${filename} complete`);
+        });
+      });
+      req.busboy.on('finish', () => {
+        console.log('Parsed all of the form!');
+        // oAuth2Client.setCredentials(formData.get('token'));
+        // console.log(oAuth2Client, ' and the key is ', formData.get('token'));
+
+        console.log(youtube);
+
+        res.send();
+      })
+    } getToken().catch(console.error);
+      // })
+      // .catch(err => console.error('ERROR REACHING URL FOR AUTH'))
   }
 }
+
+
+// const scopes = [
+    //   'https://www.googleapis.com/auth/youtube',
+    //   'https://www.googleapis.com/auth/youtube.upload'
+    // ];
+
+    // const url = oauth2Client.generateAuthUrl({
+    //   access_type: 'offline',
+    //   scope: scopes
+    // });
